@@ -44,7 +44,7 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
 #define cpu_get_pgd()					\
 ({							\
 	unsigned long pg;				\
-	asm("mrs	%0, ttbr0_el1\n"		\
+	asm __volatile__ ("mrs	%0, ttbr0_el1\n"		\
 	    : "=r" (pg));				\
 	pg &= ~0xffff000000003ffful;			\
 	(pgd_t *)phys_to_virt(pg);			\
