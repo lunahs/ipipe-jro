@@ -109,8 +109,7 @@ void arch_cpu_idle(void)
 	 * This should do all the clock switching and wait for interrupt
 	 * tricks
 	 */
-	if (!need_resched())
-		__ipipe_halt_root();
+	__ipipe_halt_root();
 	local_irq_enable();
 }
 
