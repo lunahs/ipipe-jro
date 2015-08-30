@@ -496,7 +496,11 @@ el0_da:
 	bic	x0, x26, #(0xff << 56)
 	mov	x1, x25
 	mov	x2, sp
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
 	adr	lr, ret_to_user
+#endif
 	b	do_mem_abort
 el0_ia:
 	/*
@@ -509,7 +513,11 @@ el0_ia:
 	mov	x0, x26
 	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
 	mov	x2, sp
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
 	adr	lr, ret_to_user
+#endif
 	b	do_mem_abort
 el0_fpsimd_acc:
 	/*
@@ -519,7 +527,11 @@ el0_fpsimd_acc:
 	ct_user_exit
 	mov	x0, x25
 	mov	x1, sp
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
 	adr	lr, ret_to_user
+#endif
 	b	do_fpsimd_acc
 el0_fpsimd_exc:
 	/*
@@ -529,7 +541,11 @@ el0_fpsimd_exc:
 	ct_user_exit
 	mov	x0, x25
 	mov	x1, sp
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
 	adr	lr, ret_to_user
+#endif
 	b	do_fpsimd_exc
 el0_sp_pc:
 	/*
@@ -542,7 +558,11 @@ el0_sp_pc:
 	mov	x0, x26
 	mov	x1, x25
 	mov	x2, sp
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
 	adr	lr, ret_to_user
+#endif
 	b	do_sp_pc_abort
 el0_undef:
 	/*
@@ -559,7 +579,11 @@ el0_undef:
 	enable_dbg_and_irq
 	ct_user_exit
 	mov	x0, sp
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
 	adr	lr, ret_to_user
+#endif
 	b	do_undefinstr
 el0_dbg:
 	/*
@@ -579,7 +603,11 @@ el0_inv:
 	mov	x0, sp
 	mov	x1, #BAD_SYNC
 	mrs	x2, esr_el1
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
 	adr	lr, ret_to_user
+#endif
 	b	bad_mode
 ENDPROC(el0_sync)
 
