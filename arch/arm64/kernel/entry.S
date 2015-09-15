@@ -56,6 +56,18 @@
 #endif
 	.endm
 
+#ifdef CONFIG_IPIPE
+	.macro load_ret_to_user, reg
+	adr	\reg, ret_from_exception
+	.endm
+#define PREEMPT_SCHEDULE_IRQ	__ipipe_preempt_schedule_irq
+#else /* !CONFIG_IPIPE */
+	.macro load_ret_to_user, reg
+	adr	\reg, ret_to_user
+	.endm
+#define PREEMPT_SCHEDULE_IRQ	preempt_schedule_irq
+#endif /* CONFIG_IPIPE */
+
 /*
  * Bad Abort numbers
  *-----------------
@@ -335,13 +347,13 @@ el1_undef:
 	/*
 	 * Undefined instruction
 	 */
-	#ifdef CONFIG_IPIPE
+#ifdef CONFIG_IPIPE
 	mov	x0, #7				//@ x0 = IPIPE_TRAP_UNDEFINSTR
 	mov	x1, sp				//@ x1 = &regs
 	bl	__ipipe_notify_trap		//@ branch to trap handler
 	cmp	x0, #0
 	bne	__ipipe_fast_svc_irq_exit
-	#endif /* CONFIG_IPIPE */
+#endif /* CONFIG_IPIPE */
 	enable_dbg
 	mov	x0, sp
 	b	do_undefinstr
@@ -399,11 +411,7 @@ ENDPROC(el1_irq)
 #ifdef CONFIG_PREEMPT
 el1_preempt:
 	mov	x24, lr
-#ifndef CONFIG_IPIPE
-1:	bl	preempt_schedule_irq		// irq en/disable is done inside
-#else /* CONFIG_IPIPE */
-1:	bl	__ipipe_preempt_schedule_irq	// irq en/disable is done inside
-#endif /* CONFIG_IPIPE */
+1:	bl	PREEMPT_SCHEDULE_IRQ
 	ldr	x0, [tsk, #TI_FLAGS]		// get new tasks TI_FLAGS
 	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
 	ret	x24
@@ -496,11 +504,7 @@ el0_da:
 	bic	x0, x26, #(0xff << 56)
 	mov	x1, x25
 	mov	x2, sp
-#ifdef CONFIG_IPIPE
-	adr	lr, ret_from_exception
-#else
-	adr	lr, ret_to_user
-#endif
+	load_ret_to_user lr
 	b	do_mem_abort
 el0_ia:
 	/*
@@ -513,11 +517,7 @@ el0_ia:
 	mov	x0, x26
 	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
 	mov	x2, sp
-#ifdef CONFIG_IPIPE
-	adr	lr, ret_from_exception
-#else
-	adr	lr, ret_to_user
-#endif
+	load_ret_to_user lr
 	b	do_mem_abort
 el0_fpsimd_acc:
 	/*
@@ -527,11 +527,7 @@ el0_fpsimd_acc:
 	ct_user_exit
 	mov	x0, x25
 	mov	x1, sp
-#ifdef CONFIG_IPIPE
-	adr	lr, ret_from_exception
-#else
-	adr	lr, ret_to_user
-#endif
+	load_ret_to_user lr
 	b	do_fpsimd_acc
 el0_fpsimd_exc:
 	/*
@@ -541,11 +537,7 @@ el0_fpsimd_exc:
 	ct_user_exit
 	mov	x0, x25
 	mov	x1, sp
-#ifdef CONFIG_IPIPE
-	adr	lr, ret_from_exception
-#else
-	adr	lr, ret_to_user
-#endif
+	load_ret_to_user lr
 	b	do_fpsimd_exc
 el0_sp_pc:
 	/*
@@ -558,32 +550,24 @@ el0_sp_pc:
 	mov	x0, x26
 	mov	x1, x25
 	mov	x2, sp
-#ifdef CONFIG_IPIPE
-	adr	lr, ret_from_exception
-#else
-	adr	lr, ret_to_user
-#endif
+	load_ret_to_user lr
 	b	do_sp_pc_abort
 el0_undef:
 	/*
 	 * Undefined instruction
 	 */
-	#ifdef CONFIG_IPIPE
+#ifdef CONFIG_IPIPE
 	mov	x0, #7				// x0 = IPIPE_TRAP_UNDEFINSTR
 	mov	x1, sp				// x1 = &regs
 	bl	__ipipe_notify_trap		// branch to trap handler
 	cmp	x0, #0
 	bne	ret_from_exception
-	#endif /* CONFIG_IPIPE */
+#endif /* CONFIG_IPIPE */
 	// enable interrupts before calling the main handler
 	enable_dbg_and_irq
 	ct_user_exit
 	mov	x0, sp
-#ifdef CONFIG_IPIPE
-	adr	lr, ret_from_exception
-#else
-	adr	lr, ret_to_user
-#endif
+	load_ret_to_user lr
 	b	do_undefinstr
 el0_dbg:
 	/*
@@ -603,11 +587,7 @@ el0_inv:
 	mov	x0, sp
 	mov	x1, #BAD_SYNC
 	mrs	x2, esr_el1
-#ifdef CONFIG_IPIPE
-	adr	lr, ret_from_exception
-#else
-	adr	lr, ret_to_user
-#endif
+	load_ret_to_user lr
 	b	bad_mode
 ENDPROC(el0_sync)
 
