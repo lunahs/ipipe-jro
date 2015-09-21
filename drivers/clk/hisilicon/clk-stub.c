@@ -70,7 +70,7 @@ static DEFINE_SPINLOCK(dfs_lock);
 
 static unsigned int set_freq_func_id, get_freq_func_id;
 
-static noinline int __invoke_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2)
+static notrace noinline int __invoke_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2)
 {
 	__asm__ volatile(
 			__asmeq("%0", "x0")
