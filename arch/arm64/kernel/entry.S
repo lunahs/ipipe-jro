@@ -476,8 +476,13 @@ el0_da:
 	bic	x0, x26, #(0xff << 56)
 	mov	x1, x25
 	mov	x2, sp
-	bl	do_mem_abort
-	b	ret_to_user
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
+ 	adr	lr, ret_to_user
+#endif
+ 	b	do_mem_abort
+
 el0_ia:
 	/*
 	 * Instruction abort handling
@@ -489,8 +494,12 @@ el0_ia:
 	mov	x0, x26
 	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
 	mov	x2, sp
-	bl	do_mem_abort
-	b	ret_to_user
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
+ 	adr	lr, ret_to_user
+#endif
+ 	b	do_mem_abort
 el0_fpsimd_acc:
 	/*
 	 * Floating Point or Advanced SIMD access
@@ -499,8 +508,12 @@ el0_fpsimd_acc:
 	ct_user_exit
 	mov	x0, x25
 	mov	x1, sp
-	bl	do_fpsimd_acc
-	b	ret_to_user
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
+ 	adr	lr, ret_to_user
+#endif
+ 	b	do_fpsimd_acc
 el0_fpsimd_exc:
 	/*
 	 * Floating Point or Advanced SIMD exception
@@ -509,8 +522,12 @@ el0_fpsimd_exc:
 	ct_user_exit
 	mov	x0, x25
 	mov	x1, sp
-	bl	do_fpsimd_exc
-	b	ret_to_user
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
+ 	adr	lr, ret_to_user
+#endif
+ 	b	do_fpsimd_exc
 el0_sp_pc:
 	/*
 	 * Stack or PC alignment exception handling
@@ -521,8 +538,12 @@ el0_sp_pc:
 	mov	x0, x26
 	mov	x1, x25
 	mov	x2, sp
-	bl	do_sp_pc_abort
-	b	ret_to_user
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
+ 	adr	lr, ret_to_user
+#endif
+ 	b	do_sp_pc_abort
 el0_undef:
 	/*
 	 * Undefined instruction
@@ -538,8 +559,13 @@ el0_undef:
 	enable_dbg_and_irq
 	ct_user_exit
 	mov	x0, sp
-	bl	do_undefinstr
-	b	ret_to_user
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
+ 	adr	lr, ret_to_user
+#endif
+ 	b	do_undefinstr
+
 el0_dbg:
 	/*
 	 * Debug exception handling
@@ -558,8 +584,12 @@ el0_inv:
 	mov	x0, sp
 	mov	x1, #BAD_SYNC
 	mrs	x2, esr_el1
-	bl	bad_mode
-	b	ret_to_user
+#ifdef CONFIG_IPIPE
+	adr	lr, ret_from_exception
+#else
+ 	adr	lr, ret_to_user
+#endif
+ 	b	bad_mode
 ENDPROC(el0_sync)
 
 	.align	6
