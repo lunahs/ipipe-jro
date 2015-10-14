@@ -38,6 +38,7 @@ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
 
 obj-y					+= $(arm64-obj-y) vdso/
 obj-m					+= $(arm64-obj-m)
+obj-$(CONFIG_IPIPE)	+= ipipe.o
 head-y					:= head.o
 extra-y					:= $(head-y) vmlinux.lds
 
