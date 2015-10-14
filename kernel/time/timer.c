@@ -1394,7 +1394,7 @@ void update_process_times(int user_tick)
 
 void update_root_process_times(struct pt_regs *regs)
 {
-	int cpu, user_tick = user_mode(regs);
+	int user_tick = user_mode(regs);
 
 	if (__ipipe_root_tick_p(regs)) {
 		update_process_times(user_tick);
@@ -1402,8 +1402,7 @@ void update_root_process_times(struct pt_regs *regs)
 	}
 
 	run_local_timers();
-	cpu = smp_processor_id();
-	rcu_check_callbacks(cpu, user_tick);
+	rcu_check_callbacks(user_tick);
 	run_posix_cpu_timers(current);
 }
 
