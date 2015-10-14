@@ -227,15 +227,12 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 	void __iomem *base = gic_dist_base(d);
 	unsigned int gicirq = gic_irq(d);
 	unsigned long flags;
-	int ret;
 
 	/* Interrupt configuration for SGIs can't be changed */
 	if (gicirq < 16)
 		return -EINVAL;
 
-	/* SPIs have restrictions on the supported types */
-	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-			    type != IRQ_TYPE_EDGE_RISING)
+	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
 		return -EINVAL;
 
 	raw_spin_lock_irqsave_cond(&irq_controller_lock, flags);
@@ -243,11 +240,11 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 	if (gic_arch_extn.irq_set_type)
 		gic_arch_extn.irq_set_type(d, type);
 
-	ret = gic_configure_irq(gicirq, type, base, NULL);
+	gic_configure_irq(gicirq, type, base, NULL);
 
 	raw_spin_unlock_irqrestore_cond(&irq_controller_lock, flags);
 
-	return ret;
+	return 0;
 }
 
 static int gic_retrigger(struct irq_data *d)
@@ -265,8 +262,8 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 {
 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
 	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
-	u32 val, mask, bit;
 	unsigned long flags;
+	u32 val, mask, bit;
 
 	if (!force)
 		cpu = cpumask_any_and(mask_val, cpu_online_mask);
@@ -867,16 +864,17 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
 {
 	if (hw < 32) {
 		irq_set_percpu_devid(irq);
-		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-				    handle_percpu_devid_irq, NULL, NULL);
+		irq_set_chip_and_handler(irq, &gic_chip,
+					 handle_percpu_devid_irq);
 		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
 	} else {
-		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-				    handle_fasteoi_irq, NULL, NULL);
+		irq_set_chip_and_handler(irq, &gic_chip,
+					 handle_fasteoi_irq);
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 
 		gic_routable_irq_domain_ops->map(d, irq, hw);
 	}
+	irq_set_chip_data(irq, d->host_data);
 	return 0;
 }
 
@@ -935,31 +933,6 @@ static struct notifier_block gic_cpu_notifier = {
 	.priority = 100,
 };
 #endif
-
-static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-				unsigned int nr_irqs, void *arg)
-{
-	int i, ret;
-	irq_hw_number_t hwirq;
-	unsigned int type = IRQ_TYPE_NONE;
-	struct of_phandle_args *irq_data = arg;
-
-	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-				   irq_data->args_count, &hwirq, &type);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < nr_irqs; i++)
-		gic_irq_domain_map(domain, virq + i, hwirq + i);
-
-	return 0;
-}
-
-static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
-	.xlate = gic_irq_domain_xlate,
-	.alloc = gic_irq_domain_alloc,
-	.free = irq_domain_free_irqs_top,
-};
 
 static const struct irq_domain_ops gic_irq_domain_ops = {
 	.map = gic_irq_domain_map,
@@ -1051,6 +1024,18 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 		gic_cpu_map[i] = 0xff;
 
 	/*
+	 * For primary GICs, skip over SGIs.
+	 * For secondary GICs, skip over PPIs, too.
+	 */
+	if (gic_nr == 0 && (irq_start & 31) > 0) {
+		hwirq_base = 16;
+		if (irq_start != -1)
+			irq_start = (irq_start & ~31) + 16;
+	} else {
+		hwirq_base = 32;
+	}
+
+	/*
 	 * Find out how many interrupts are supported.
 	 * The GIC only supports up to 1020 interrupt sources.
 	 */
@@ -1060,31 +1045,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 		gic_irqs = 1020;
 	gic->gic_irqs = gic_irqs;
 
-	if (node) {		/* DT case */
-		const struct irq_domain_ops *ops = &gic_irq_domain_hierarchy_ops;
+	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
 
-		if (!of_property_read_u32(node, "arm,routable-irqs",
-					  &nr_routable_irqs)) {
-			ops = &gic_irq_domain_ops;
-			gic_irqs = nr_routable_irqs;
-		}
-
-		gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
-	} else {		/* Non-DT case */
-		/*
-		 * For primary GICs, skip over SGIs.
-		 * For secondary GICs, skip over PPIs, too.
-		 */
-		if (gic_nr == 0 && (irq_start & 31) > 0) {
-			hwirq_base = 16;
-			if (irq_start != -1)
-				irq_start = (irq_start & ~31) + 16;
-		} else {
-			hwirq_base = 32;
-		}
-
-		gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
-
+	if (of_property_read_u32(node, "arm,routable-irqs",
+				 &nr_routable_irqs)) {
 		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
 					   numa_node_id());
 		if (IS_ERR_VALUE(irq_base)) {
@@ -1095,6 +1059,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 
 		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
 					hwirq_base, &gic_irq_domain_ops, gic);
+	} else {
+		gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
+						    &gic_irq_domain_ops,
+						    gic);
 	}
 
 	if (WARN_ON(!gic->domain))
@@ -1145,16 +1113,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 		irq = irq_of_parse_and_map(node, 0);
 		gic_cascade_irq(gic_cnt, irq);
 	}
-
-	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
-		gicv2m_of_init(node, gic_data[gic_cnt].domain);
-
 	gic_cnt++;
 	return 0;
 }
 IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
-IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", gic_of_init);
-IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", gic_of_init);
 IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
 IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
 IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
