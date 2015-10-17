@@ -422,7 +422,9 @@ struct task_struct *__switch_to(struct task_struct *prev,
 				struct task_struct *next)
 {
 	struct task_struct *last;
+	unsigned long flags;
 
+	flags = hard_cond_local_irq_save();
 	fpsimd_thread_switch(next);
 	tls_thread_switch(next);
 	hw_breakpoint_thread_switch(next);
@@ -436,6 +438,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 
 	/* the actual thread switch */
 	last = cpu_switch_to(prev, next);
+	hard_cond_local_irq_restore(flags);
 
 	return last;
 }
