@@ -313,7 +313,7 @@ static void __arch_timer_setup(unsigned type,
 			clk->features |= CLOCK_EVT_FEAT_C3STOP;
 		clk->name = "arch_sys_timer";
 		clk->rating = 450;
-		clk->cpumask = cpumask_of(smp_processor_id());
+		clk->cpumask = cpumask_of(ipipe_processor_id());
 		if (arch_timer_use_virtual) {
 			clk->irq = arch_timer_ppi[VIRT_PPI];
 			clk->set_mode = arch_timer_set_mode_virt;
@@ -342,15 +342,17 @@ static void __arch_timer_setup(unsigned type,
 	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, clk);
 
 #ifdef CONFIG_IPIPE
-	clk->ipipe_timer = raw_cpu_ptr(&arch_itimer);
-	if (arch_timer_use_virtual) {
-		clk->ipipe_timer->irq = arch_timer_ppi[VIRT_PPI];
-		clk->ipipe_timer->ack = arch_itimer_ack_virt;
-	} else {
-		clk->ipipe_timer->irq = arch_timer_ppi[PHYS_SECURE_PPI];
-		clk->ipipe_timer->ack = arch_itimer_ack_phys;
+	if (type == ARCH_CP15_TIMER) {
+		clk->ipipe_timer = raw_cpu_ptr(&arch_itimer);
+		if (arch_timer_use_virtual) {
+			clk->ipipe_timer->irq = arch_timer_ppi[VIRT_PPI];
+			clk->ipipe_timer->ack = arch_itimer_ack_virt;
+		} else {
+			clk->ipipe_timer->irq = arch_timer_ppi[PHYS_SECURE_PPI];
+			clk->ipipe_timer->ack = arch_itimer_ack_phys;
+		}
+		clk->ipipe_timer->freq = arch_timer_rate;
 	}
-	clk->ipipe_timer->freq = arch_timer_rate;
 #endif
 
 	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
@@ -559,7 +561,7 @@ static void __init arch_counter_register(unsigned type)
 static void arch_timer_stop(struct clock_event_device *clk)
 {
 	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
-		 clk->irq, smp_processor_id());
+		 clk->irq, ipipe_processor_id());
 
 	if (arch_timer_use_virtual)
 		disable_percpu_irq(arch_timer_ppi[VIRT_PPI]);
