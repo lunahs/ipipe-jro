@@ -127,6 +127,12 @@ void ipipe_timer_register(struct ipipe_timer *timer)
 	spin_lock_irqsave(&lock, flags);
 
 	list_for_each_entry(t, &timers, link) {
+		/*
+		 * this condition will lead to an infinite loop while iterating
+		 * the list during ipipe_select_timers.
+		 */
+		BUG_ON(t == timer);
+
 		if (t->rating <= timer->rating) {
 			__list_add(&timer->link, t->link.prev, &t->link);
 			goto done;
