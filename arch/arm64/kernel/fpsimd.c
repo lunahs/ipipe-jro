@@ -172,10 +172,12 @@ void fpsimd_flush_thread(void)
  */
 void fpsimd_preserve_current_state(void)
 {
-	preempt_disable();
+	unsigned long flags;
+
+	flags = hard_local_irq_save();
 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
 		fpsimd_save_state(&current->thread.fpsimd_state);
-	preempt_enable();
+	hard_local_irq_restore(flags);
 }
 
 /*
@@ -185,7 +187,9 @@ void fpsimd_preserve_current_state(void)
  */
 void fpsimd_restore_current_state(void)
 {
-	preempt_disable();
+	unsigned long flags;
+
+	flags = hard_local_irq_save();
 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
 		struct fpsimd_state *st = &current->thread.fpsimd_state;
 
@@ -193,7 +197,7 @@ void fpsimd_restore_current_state(void)
 		this_cpu_write(fpsimd_last_state, st);
 		st->cpu = smp_processor_id();
 	}
-	preempt_enable();
+	hard_local_irq_restore(flags);
 }
 
 /*
@@ -203,7 +207,9 @@ void fpsimd_restore_current_state(void)
  */
 void fpsimd_update_current_state(struct fpsimd_state *state)
 {
-	preempt_disable();
+	unsigned long flags;
+
+	flags = hard_local_irq_save();
 	fpsimd_load_state(state);
 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
 		struct fpsimd_state *st = &current->thread.fpsimd_state;
@@ -211,7 +217,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
 		this_cpu_write(fpsimd_last_state, st);
 		st->cpu = smp_processor_id();
 	}
-	preempt_enable();
+	hard_local_irq_restore(flags);
 }
 
 /*
