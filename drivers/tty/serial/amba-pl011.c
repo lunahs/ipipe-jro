@@ -2150,7 +2150,7 @@ void __ipipe_serial_debug(const char *fmt, ...)
 	 * to be terse enough to cope with low latency at the selected
 	 * serial speed.
 	 */
-	uart_console_write(&uap->port, buf, count, __ipipe_putchar);
+	uart_console_write(&uap->port, buf, count, pl011_putc);
 	writew(old_cr, uap->port.membase + UART011_CR);
 
         spin_unlock_irqrestore(&ipipe_amba_lock, flags);
