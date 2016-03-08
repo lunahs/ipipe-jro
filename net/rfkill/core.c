@@ -818,6 +818,9 @@ static int rfkill_resume(struct device *dev)
 
 	return 0;
 }
+#else
+void rfkill_resume_polling(struct rfkill *rfkill) { }
+static int rfkill_suspend(struct device *dev, pm_message_t state) { return 0;}
 #endif
 
 static struct class rfkill_class = {
