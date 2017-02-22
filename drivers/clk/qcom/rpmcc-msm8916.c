@@ -144,6 +144,12 @@ static int rpm_clk_probe(struct platform_device *pdev)
 
 	clk_set_rate(snoc_clk.hw.clk, 0x7fffffff);
 	clk_prepare_enable(snoc_clk.hw.clk);
+
+	clk_set_rate(pcnoc_clk.hw.clk, INT_MAX);
+      	clk_prepare_enable(pcnoc_clk.hw.clk);
+      	clk_prepare_enable(xo.hw.clk);
+
+
 	return 0;
 }
 
