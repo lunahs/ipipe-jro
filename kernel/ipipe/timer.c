@@ -160,6 +160,7 @@ void ipipe_timer_register(struct ipipe_timer *timer)
 	raw_spin_lock_irqsave(&lock, flags);
 
 	list_for_each_entry(t, &timers, link) {
+		BUG_ON(t == timer);
 		if (t->rating <= timer->rating) {
 			__list_add(&timer->link, t->link.prev, &t->link);
 			goto done;
